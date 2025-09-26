@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IoT • Device Monitoring Dashboard (with Alerts)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .thin-scrollbar::-webkit-scrollbar{width:8px;height:8px}
+    .thin-scrollbar::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:8px}
+    .thin-scrollbar::-webkit-scrollbar-track{background:#f1f5f9}
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <!-- Header -->
+  <header class="sticky top-0 z-30 backdrop-blur bg-white/80 border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 grid place-content-center text-white font-bold">IoT</div>
+        <div>
+          <h1 class="text-xl font-semibold leading-tight">Device Monitoring Dashboard</h1>
+          <p class="text-xs text-slate-500">Single-file demo · Tailwind + Vanilla JS</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="addDeviceBtn" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm hover:bg-blue-700">Add demo device</button>
+        <button id="addFiveBtn" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm hover:bg-slate-800">Add 5 random</button>
+        <button id="refreshBtn" class="px-4 py-2 rounded-xl bg-slate-100 text-sm border border-slate-300 hover:bg-slate-200">Refresh</button>
+        <button id="clearAllBtn" class="px-4 py-2 rounded-xl bg-rose-600 text-white text-sm hover:bg-rose-700">Clear all</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 md:px-6 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left: Summary & Creator -->
+    <section class="lg:col-span-2 space-y-6">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="rounded-2xl p-4 bg-white border border-slate-200">
+          <div class="text-xs text-slate-500">Total Devices</div>
+          <div id="statTotal" class="mt-1 text-2xl font-semibold">0</div>
+        </div>
+        <div class="rounded-2xl p-4 bg-white border border-slate-200">
+          <div class="text-xs text-slate-500">Online</div>
+          <div id="statOnline" class="mt-1 text-2xl font-semibold text-emerald-600">0</div>
+        </div>
+        <div class="rounded-2xl p-4 bg-white border border-slate-200">
+          <div class="text-xs text-slate-500">Offline</div>
+          <div id="statOffline" class="mt-1 text-2xl font-semibold text-rose-600">0</div>
+        </div>
+        <div class="rounded-2xl p-4 bg-white border border-slate-200">
+          <div class="text-xs text-slate-500">Rebooting</div>
+          <div id="statReboot" class="mt-1 text-2xl font-semibold text-amber-600">0</div>
+        </div>
+      </div>
+
+      <div class="rounded-2xl p-4 bg-white border border-slate-200">
+        <h2 class="font-semibold mb-2">Create Demo Device</h2>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2">
+            <label class="text-xs text-slate-500">Name</label>
+            <input id="devName" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="e.g., Lab Sensor 01" />
+          </div>
+          <div class="col-span-2">
+            <label class="text-xs text-slate-500">Type</label>
+            <select id="devType" class="w-full mt-1 px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600">
+              <option value="temperature">Temperature Sensor</option>
+              <option value="motion">Motion Detector</option>
+              <option value="light">Smart Light</option>
+              <option value="air">Air Quality</option>
+            </select>
+          </div>
+          <div class="col-span-2 flex items-end">
+            <button id="createBtn" class="w-full px-4 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700">Add Device</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Devices -->
+      <div class="rounded-2xl p-3 bg-white border border-slate-200 mb-3 flex items-center justify-between">
+        <div class="text-sm text-slate-600">Showing <span id="visibleCount">0</span> devices</div>
+        <div class="text-xs text-slate-500">Use buttons on each card to toggle power or reboot</div>
+      </div>
+      <div id="grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    </section>
+
+    <!-- Right: Alerts Panel -->
+    <aside class="space-y-4">
+      <div class="rounded-2xl p-4 bg-white border border-slate-200">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold">Alerts</h2>
+          <div class="flex items-center gap-2">
+            <select id="alertFilter" class="text-sm px-2 py-1 rounded-lg border border-slate-300">
+              <option value="all">All severities</option>
+              <option value="critical">Critical</option>
+              <option value="warning">Warning</option>
+              <option value="info">Info</option>
+            </select>
+            <button id="clearAlerts" class="text-sm px-3 py-1 rounded-lg bg-slate-100 hover:bg-slate-200">Clear</button>
+          </div>
+        </div>
+        <div id="alertsList" class="max-h-[70vh] overflow-auto thin-scrollbar space-y-2"></div>
+      </div>
+
+      <div class="rounded-2xl p-4 bg-white border border-slate-200">
+        <h3 class="font-semibold mb-1">Heuristics used</h3>
+        <ul class="text-sm text-slate-600 list-disc pl-5 space-y-1">
+          <li><span class="font-medium">Low battery</span>: &lt; 15% (warning)</li>
+          <li><span class="font-medium">Missed heartbeat</span>: no update for &gt; 30s while online (critical)</li>
+          <li><span class="font-medium">Temperature high</span>: &gt; 45°C (critical)</li>
+          <li><span class="font-medium">PM2.5 elevated</span>: &gt; 80µg/m³ (warning), &gt; 150µg/m³ (critical)</li>
+          <li><span class="font-medium">CO₂ elevated</span>: &gt; 1200ppm (warning)</li>
+        </ul>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Templates -->
+  <template id="cardTpl">
+    <div class="card rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-3">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="name font-semibold">Device</span>
+            <span class="type text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">type</span>
+          </div>
+          <div class="text-xs text-slate-500 mt-0.5">Last updated <span class="updated">—</span></div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="dot inline-block w-2.5 h-2.5 rounded-full"></span>
+          <span class="status text-sm font-medium">status</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="rounded-xl bg-slate-50 p-3">
+          <div class="text-xs text-slate-500">Sensor</div>
+          <div class="readings font-mono mt-1">—</div>
+        </div>
+        <div class="rounded-xl bg-slate-50 p-3">
+          <div class="text-xs text-slate-500">Battery</div>
+          <div class="mt-1 flex items-center gap-2">
+            <div class="bar w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+              <div class="fill h-full rounded-full"></div>
+            </div>
+            <span class="bat-text font-mono">—%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 mt-1">
+        <button class="btn-toggle px-3 py-2 rounded-xl bg-slate-900 text-white text-xs">Toggle Power</button>
+        <button class="btn-reboot px-3 py-2 rounded-xl bg-slate-100 text-xs border border-slate-200">Reboot</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="alertItemTpl">
+    <div class="rounded-xl border p-3 text-sm">
+      <div class="flex items-center justify-between">
+        <div class="font-medium alert-title">Alert</div>
+        <div class="text-xs text-slate-500 alert-time">time</div>
+      </div>
+      <div class="mt-1 text-slate-700 alert-body">body</div>
+      <div class="mt-2 flex items-center gap-2">
+        <span class="severity-badge text-xs px-2 py-0.5 rounded-full"></span>
+        <span class="text-xs text-slate-500 alert-device">device</span>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    // ===== Utilities =====
+    const $ = (s, c=document) => c.querySelector(s);
+    const $$ = (s, c=document) => Array.from(c.querySelectorAll(s));
+    const nowIso = () => new Date().toISOString();
+    const fmt = (d) => new Date(d).toLocaleString();
+    const rand = (a,b) => Math.random()*(b-a)+a;
+    const randi = (a,b) => Math.floor(rand(a,b+1));
+    const clamp = (v,a,b) => Math.max(a, Math.min(b,v));
+
+    // ===== Data =====
+    let devices = [];
+    let nextId = 1;
+    let alerts = [];
+
+    // ===== Device Factory =====
+    function makeDevice(type,name){
+      const id = nextId++;
+      const d = { id, name: name||suggestName(type), type, status:'online', battery:randi(40,100), readings:{}, updatedAt:nowIso(), meta:{ lowBattery:false } };
+      seedReadings(d);
+      return d;
+    }
+
+    function seedReadings(d){
+      if(d.type==='temperature') d.readings = { tempC: rand(18,28), rh: rand(30,60) };
+      if(d.type==='motion') d.readings = { motion: Math.random()<0.05 };
+      if(d.type==='light') d.readings = { on: Math.random()<0.7, brightness:randi(10,100) };
+      if(d.type==='air') d.readings = { pm25: rand(5,90), co2: rand(500,1100) };
+    }
+
+    // ===== Updating / Simulation =====
+    function updateDevice(d){
+      if(d.status!=='online') return;
+      d.updatedAt = nowIso();
+      const prev = d.battery;
+      d.battery = clamp(d.battery - rand(0.2,1.0), 0, 100);
+      if(d.type==='temperature'){ d.readings.tempC = clamp(d.readings.tempC + rand(-0.8,0.9), -20, 100); d.readings.rh = clamp(d.readings.rh + rand(-2,2), 0,100); }
+      if(d.type==='motion'){ d.readings.motion = Math.random()<0.07; }
+      if(d.type==='light'){ if(Math.random()<0.05) d.readings.on=!d.readings.on; d.readings.brightness = d.readings.on? clamp(d.readings.brightness + randi(-10,10),0,100):0; }
+      if(d.type==='air'){ d.readings.pm25 = clamp(d.readings.pm25 + rand(-6,6),0,250); d.readings.co2 = clamp(d.readings.co2 + rand(-60,60),350,2500); }
+
+      // Heuristic: first time crossing below 15% battery
+      if(d.battery < 15 && !d.meta.lowBattery){
+        d.meta.lowBattery = true;
+        addAlert('warning','Low Battery', `${d.name} at ${d.battery.toFixed(0)}% — Rationale: <15% risks brownout/data loss.`, d);
+      }
+    }
+
+    // ===== Alert Engine =====
+    function addAlert(severity, title, body, device){
+      alerts.push({ severity, title, body, deviceId: device.id, deviceName: device.name, at: nowIso() });
+    }
+
+    function evaluateAlerts(){
+      const now = Date.now();
+      devices.forEach(d => {
+        // Missed heartbeat (no update > 30s while online)
+        if(d.status==='online'){
+          const ageSec = (now - new Date(d.updatedAt).getTime())/1000;
+          if(ageSec > 30){
+            addAlert('critical','Missed Heartbeat', `${d.name} no update for ${ageSec.toFixed(0)}s — Rationale: Loss of telemetry indicates network/power issue.`, d);
+          }
+        }
+        // Abnormal sensor readings
+        if(d.type==='temperature' && d.status==='online' && d.readings.tempC>45){
+          addAlert('critical','Overheat Risk', `${d.name} ${d.readings.tempC.toFixed(1)}°C — Rationale: >45°C exceeds safe enclosure limits.`, d);
+        }
+        if(d.type==='air' && d.status==='online'){
+          if(d.readings.pm25>150){ addAlert('critical','PM2.5 Hazard', `${d.name} PM2.5 ${d.readings.pm25.toFixed(0)}µg/m³ — Rationale: >150 unhealthy; trigger ventilation.`, d); }
+          else if(d.readings.pm25>80){ addAlert('warning','PM2.5 Elevated', `${d.name} PM2.5 ${d.readings.pm25.toFixed(0)}µg/m³ — Rationale: >80 poor air quality.`, d); }
+          if(d.readings.co2>1200){ addAlert('warning','CO₂ Elevated', `${d.name} CO₂ ${d.readings.co2.toFixed(0)}ppm — Rationale: >1200 reduces cognitive performance.`, d); }
+        }
+      });
+    }
+
+    function severityStyles(sev){
+      switch (sev) {
+        case 'critical': return { badge: 'bg-rose-100 text-rose-700', border: 'border-rose-200' };
+        case 'warning': return { badge: 'bg-amber-100 text-amber-700', border: 'border-amber-200' };
+        default: return { badge: 'bg-sky-100 text-sky-700', border: 'border-sky-200' };
+      }
+    }
+
+    function renderAlerts(){
+      const list = document.getElementById('alertsList');
+      if(!list) return;
+      const filter = document.getElementById('alertFilter').value;
+      list.innerHTML = '';
+      const tpl = document.getElementById('alertItemTpl');
+      alerts
+        .filter(a => filter==='all' || a.severity===filter)
+        .slice().reverse()
+        .forEach(a => {
+          const node = tpl.content.cloneNode(true);
+          const styles = severityStyles(a.severity);
+          const box = node.firstElementChild;
+          box.className = `rounded-xl border p-3 text-sm ${styles.border}`;
+          box.querySelector('.alert-title').textContent = a.title;
+          box.querySelector('.alert-time').textContent = fmt(a.at);
+          box.querySelector('.alert-body').textContent = a.body;
+          box.querySelector('.alert-device').textContent = a.deviceName;
+          const b = box.querySelector('.severity-badge');
+          b.className = `severity-badge text-xs px-2 py-0.5 rounded-full ${styles.badge}`;
+          b.textContent = a.severity.toUpperCase();
+          list.appendChild(node);
+        });
+    }
+
+    // ===== Rendering =====
+    function render(){
+      // summary
+      $('#statTotal').textContent = devices.length;
+      $('#statOnline').textContent = devices.filter(d=>d.status==='online').length;
+      $('#statOffline').textContent = devices.filter(d=>d.status==='offline').length;
+      $('#statReboot').textContent = devices.filter(d=>d.status==='rebooting').length;
+
+      const grid = $('#grid'); grid.innerHTML='';
+      const tpl = $('#cardTpl');
+      let visible=0;
+      devices.slice().sort((a,b)=>b.id-a.id).forEach(d=>{
+        const node = tpl.content.cloneNode(true);
+        const card = $('.card', node);
+        $('.name', card).textContent = d.name;
+        $('.type', card).textContent = labelType(d.type);
+        $('.updated', card).textContent = fmt(d.updatedAt);
+        const dot = $('.dot', card);
+        dot.className = `dot inline-block w-2.5 h-2.5 rounded-full ${d.status==='online'?'bg-emerald-500': d.status==='rebooting'?'bg-amber-500':'bg-rose-500'}`;
+        $('.status', card).textContent = d.status;
+        $('.readings', card).textContent = readingsText(d);
+        const fill = $('.fill', card);
+        fill.style.width = `${d.battery.toFixed(0)}%`;
+        fill.className = `fill h-full rounded-full ${d.battery>50?'bg-emerald-500': d.battery>20?'bg-amber-500':'bg-rose-500'}`;
+        $('.bat-text', card).textContent = `${d.battery.toFixed(0)}%`;
+
+        $('.btn-toggle', card).addEventListener('click', ()=>togglePower(d.id));
+        $('.btn-reboot', card).addEventListener('click', ()=>reboot(d.id));
+        grid.appendChild(node);
+        visible++;
+      });
+      $('#visibleCount').textContent = visible;
+
+      renderAlerts();
+    }
+
+    function readingsText(d){
+      const r=d.readings; const t=d.type;
+      if(t==='temperature') return `T=${r.tempC.toFixed(1)}°C, RH=${r.rh.toFixed(0)}%`;
+      if(t==='motion') return r.motion? 'Motion: YES':'Motion: —';
+      if(t==='light') return `${r.on?'ON':'OFF'}, ${r.brightness.toFixed(0)}%`;
+      if(t==='air') return `PM2.5=${r.pm25.toFixed(0)}µg/m³, CO₂=${r.co2.toFixed(0)}ppm`;
+      return JSON.stringify(r);
+    }
+
+    function labelType(t){
+      return ({temperature:'Temperature Sensor', motion:'Motion Detector', light:'Smart Light', air:'Air Quality'})[t]||t;
+    }
+
+    // ===== Actions =====
+    function addDevice(type,name){ devices.push(makeDevice(type,name)); render(); }
+    function addFive(){ ['temperature','motion','light','air'].sort(()=>Math.random()-0.5).forEach(t=>addDevice(t)); addDevice(pick(['temperature','motion','light','air'])); }
+    function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+    function clearAll(){ devices=[]; nextId=1; alerts=[]; render(); }
+    function refreshAll(){ devices.forEach(updateDevice); evaluateAlerts(); render(); }
+
+    function togglePower(id){ const d=devices.find(x=>x.id===id); if(!d) return; d.status = d.status==='online'? 'offline':'online'; d.updatedAt=nowIso(); if(d.status==='offline'){ addAlert('critical','Device Offline', `${d.name} taken offline — Rationale: No telemetry expected until power on.`, d);} render(); }
+
+    function reboot(id){ const d=devices.find(x=>x.id===id); if(!d||d.status!=='online') return; d.status='rebooting'; render(); setTimeout(()=>{ d.status='online'; d.updatedAt=nowIso(); addAlert('info','Reboot Complete', `${d.name} rebooted successfully — Rationale: Heartbeat restored post-reset.`, d); render(); }, 2500); }
+
+    function suggestName(type){ const base=labelType(type); const n=devices.filter(x=>x.type===type).length+1; return `${base} ${String(n).padStart(2,'0')}`; }
+
+    // ===== Init =====
+    function bindUI(){
+      $('#addDeviceBtn').addEventListener('click', ()=> addDevice($('#devType')?.value || 'temperature', $('#devName')?.value.trim() || undefined));
+      $('#addFiveBtn').addEventListener('click', addFive);
+      $('#refreshBtn').addEventListener('click', refreshAll);
+      $('#clearAllBtn').addEventListener('click', clearAll);
+      $('#createBtn').addEventListener('click', ()=> addDevice($('#devType').value, $('#devName').value.trim()||undefined));
+      $('#alertFilter').addEventListener('change', renderAlerts);
+      $('#clearAlerts').addEventListener('click', ()=>{ alerts=[]; renderAlerts(); });
+    }
+
+    function init(){
+      bindUI();
+      addFive();
+      render();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
